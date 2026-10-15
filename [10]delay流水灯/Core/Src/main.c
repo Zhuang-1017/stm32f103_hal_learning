@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+ï»¿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -94,20 +94,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_SET);//ºìµÆÁÁ
-	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);//ÂÌµÆÃð
-	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);//À¶µÆÃð
-	HAL_Delay(500);//ÑÓÊ±500ms
+	HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_SET);//çº¢ç¯äº®
+	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);//ç»¿ç¯ç­
+	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);//è“ç¯ç­
+	HAL_Delay(500);//å»¶æ—¶500ms
 	
-	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_SET);//ÂÌµÆÁÁ
-	HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);//ºìµÆÃð
-	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);//À¶µÆÃð
-	HAL_Delay(500);//ÑÓÊ±500ms
+	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_SET);//ç»¿ç¯äº®
+	HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);//çº¢ç¯ç­
+	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_RESET);//è“ç¯ç­
+	HAL_Delay(500);//å»¶æ—¶500ms
 	
-	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_SET);//À¶µÆÁÁ
-	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);//ÂÌµÆÃð
-	HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);//ºìµÆÃð
-	HAL_Delay(500);//ÑÓÊ±500ms
+	HAL_GPIO_WritePin(GPIOA, LED_B_Pin, GPIO_PIN_SET);//è“ç¯äº®
+	HAL_GPIO_WritePin(GPIOA, LED_G_Pin, GPIO_PIN_RESET);//ç»¿ç¯ç­
+	HAL_GPIO_WritePin(GPIOA, LED_R_Pin, GPIO_PIN_RESET);//çº¢ç¯ç­
+	HAL_Delay(500);//å»¶æ—¶500ms
 	
     /* USER CODE END WHILE */
 
