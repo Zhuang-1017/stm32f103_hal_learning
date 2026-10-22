@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+ï»¿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -94,11 +94,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	if(HAL_GPIO_ReadPin(GPIOA, K1_Pin) == GPIO_PIN_RESET)//°´¼ü¼ì²â
+	if(HAL_GPIO_ReadPin(GPIOA, K1_Pin) == GPIO_PIN_RESET)//æŒ‰é”®æ£€æµ‹
 	{
-		HAL_GPIO_WritePin(GPIOA, beef_Pin, GPIO_PIN_RESET);//·äÃùÆ÷Ïì
+		HAL_GPIO_WritePin(GPIOA, beef_Pin, GPIO_PIN_RESET);//èœ‚é¸£å™¨å“
 		HAL_Delay(1000);
-		HAL_GPIO_WritePin(GPIOA, beef_Pin, GPIO_PIN_SET);//·äÃùÆ÷²»Ïì
+		HAL_GPIO_WritePin(GPIOA, beef_Pin, GPIO_PIN_SET);//èœ‚é¸£å™¨ä¸å“
 	}
     /* USER CODE END WHILE */
 

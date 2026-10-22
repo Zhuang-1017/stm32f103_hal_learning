@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+ï»¿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -94,13 +94,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	if(HAL_GPIO_ReadPin(GPIOA, K1_PC13_Pin )== GPIO_PIN_RESET)//¼ì²â°´¼üÊÇ·ñ°´ÏÂ£¬ÉÏÀ­µç×èÊ±0Îª°´ÏÂ,ÏÂÀ­µç×èÊ±1Îª°´ÏÂ
+	if(HAL_GPIO_ReadPin(GPIOA, K1_PC13_Pin )== GPIO_PIN_RESET)//æ£€æµ‹æŒ‰é”®æ˜¯å¦æŒ‰ä¸‹ï¼Œä¸Šæ‹‰ç”µé˜»æ—¶0ä¸ºæŒ‰ä¸‹,ä¸‹æ‹‰ç”µé˜»æ—¶1ä¸ºæŒ‰ä¸‹
 	{
 		HAL_Delay(20);
 		if (HAL_GPIO_ReadPin(GPIOA, K1_PC13_Pin) == GPIO_PIN_RESET)
         {
-            HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);               // ·­×ª LED
-            while (HAL_GPIO_ReadPin(GPIOA, K1_PC13_Pin) == GPIO_PIN_RESET); // µÈËÉÊÖ£¬·ÀÖ¹Á¬·­
+            HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);               // ç¿»è½¬ LED
+            while (HAL_GPIO_ReadPin(GPIOA, K1_PC13_Pin) == GPIO_PIN_RESET); // ç­‰æ¾æ‰‹ï¼Œé˜²æ­¢è¿žç¿»
         }
 	}
     /* USER CODE END WHILE */
