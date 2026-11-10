@@ -18,6 +18,7 @@
 | `[19-2]串口发送字符串以及printf函数的应用` | 串口发字符串：`HAL_UART_Transmit` + `strlen`；重定向 `fputc` 后 `printf` 直接走 USART1 |
 | `[19-3]串口发送之更换脚组` | 换脚验证：改用 **USART2（TX=PA2 / RX=PA3）** 发送，`MX_USART2_UART_Init()` + `fputc` 改 `&huart2`；印证 TX/RX 必须交叉 |
 | `[19-4]串口的阻塞接收` | 阻塞接收：`HAL_UART_Receive(&huart1, Recvbuff, 2, HAL_MAX_DELAY)` 等满 2 字节，再用 `HAL_UART_Transmit` 回显；验证阻塞语义（收不满就卡住） |
+| `[19-5]串口发送之中断发送方式` | 中断收发：`HAL_UART_Receive_IT` 等满 `LENGTH=6` 字节触发中断 → `HAL_UART_RxCpltCallback` 中用 `HAL_UART_Transmit_IT` 回显并重新使能接收；主循环全空，完全中断驱动 |
 
 ## 硬件平台
 
@@ -46,7 +47,7 @@
 ## 如何编译
 
 用 Keil 打开各工程 `MDK-ARM/` 目录下的 `*.uvprojx`，编译并下载到板子即可。
-（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`，与目录名不必一致。）
+（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`，与目录名不必一致。）
 
 ## 目录说明
 
