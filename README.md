@@ -20,6 +20,7 @@
 | `[19-4]串口的阻塞接收` | 阻塞接收：`HAL_UART_Receive(&huart1, Recvbuff, 2, HAL_MAX_DELAY)` 等满 2 字节，再用 `HAL_UART_Transmit` 回显；验证阻塞语义（收不满就卡住） |
 | `[19-5]串口发送之中断发送方式` | 中断收发：`HAL_UART_Receive_IT` 等满 `LENGTH=6` 字节触发中断 → `HAL_UART_RxCpltCallback` 中用 `HAL_UART_Transmit_IT` 回显并重新使能接收；主循环全空，完全中断驱动 |
 | `[19-6]串口发送控制led` | 串口命令控制：逐字节中断接收（每次 1 字节）→ `strncmp` 比对 `"ON"` / `"OFF"` → 点亮 / 熄灭 PA1/PA2/PA3 三路 LED；主循环全空 |
+| `[19-7]串口发送之中断接收不定长数据` | **空闲中断接收不定长**：`HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxBuff, 64)` → 一帧结束（IDLE）触发 `HAL_UARTEx_RxEventCallback(huart, Size)`，`Size` 即本帧实际长度；回调中 `HAL_UART_Transmit_IT` 回显并重新使能；与 `[19-5]` 的"等满定长"形成对照 |
 
 ## 硬件平台
 
@@ -48,7 +49,7 @@
 ## 如何编译
 
 用 Keil 打开各工程 `MDK-ARM/` 目录下的 `*.uvprojx`，编译并下载到板子即可。
-（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`，与目录名不必一致。）
+（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`，与目录名不必一致。）
 
 ## 目录说明
 
