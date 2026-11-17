@@ -21,6 +21,7 @@
 | `[19-5]串口发送之中断发送方式` | 中断收发：`HAL_UART_Receive_IT` 等满 `LENGTH=6` 字节触发中断 → `HAL_UART_RxCpltCallback` 中用 `HAL_UART_Transmit_IT` 回显并重新使能接收；主循环全空，完全中断驱动 |
 | `[19-6]串口发送控制led` | 串口命令控制：逐字节中断接收（每次 1 字节）→ `strncmp` 比对 `"ON"` / `"OFF"` → 点亮 / 熄灭 PA1/PA2/PA3 三路 LED；主循环全空 |
 | `[19-7]串口发送之中断接收不定长数据` | **空闲中断接收不定长**：`HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxBuff, 64)` → 一帧结束（IDLE）触发 `HAL_UARTEx_RxEventCallback(huart, Size)`，`Size` 即本帧实际长度；回调中 `HAL_UART_Transmit_IT` 回显并重新使能；与 `[19-5]` 的"等满定长"形成对照 |
+| `[19-8]串口之多串口应用` | **双串口互转**：同时开启 USART1（PA9/PA10）与 USART2（PA2/PA3）的空闲中断接收，两路各自独立缓冲区 `RxBuff1` / `RxBuff2`；回调中按 `huart->Instance` 分流，把本路收的帧**转发到另一路**再重开本路接收。要点：转发必须用**阻塞** `HAL_UART_Transmit`——若用 `Transmit_IT`，`gState` 立刻变 `BUSY_TX`，紧随其后的阻塞打印会因首句 `if (gState == READY)` 不成立而整串返回 `HAL_BUSY`，一个字都出不去；且 `_IT` 未发完就重开接收，同一 buffer 会被边发边写覆盖 |
 
 ## 硬件平台
 
@@ -39,6 +40,8 @@
 > 串口接线注意：USB-TTL 的 **TXD → PA10、RXD → PA9**（必须交叉），**GND 必须共地**，模块 **VCC 不要接到板子**（板子由 ST-Link 供电）。模块电平需为 3.3V。
 >
 > 用 USART2 时改接 **TXD → PA3（第 8 脚）、RXD → PA2（第 7 脚）**。注意 PA2 是 TX、PA3 是 RX，与模块的 TXD/RXD 顺序相反，**按同名平推会接成 TX-TX，表现为一个字节都收不到**。另需先拔掉 PA2/PA3 上的 RGB 灯线，否则 LED 挂在 UART 线上吃电流。
+>
+> 跑 `[19-8]` 这类**双串口**实验需要**两个独立的 USB-TTL 模块**（各占电脑一个 USB 口），一路接 PA9/PA10、另一路接 PA2/PA3。只有一个模块时，另一侧没有对端，双向转发无法验证。**切勿**把 PA9/PA10 与 PA2/PA3 互相短接做回环——USART1→USART2→USART1 会形成无限转发。
 
 ## 开发环境
 
@@ -49,7 +52,7 @@
 ## 如何编译
 
 用 Keil 打开各工程 `MDK-ARM/` 目录下的 `*.uvprojx`，编译并下载到板子即可。
-（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`，与目录名不必一致。）
+（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`、`[19-8]` 目录下是 `19-8.uvprojx`，与目录名不必一致。）
 
 ## 目录说明
 
