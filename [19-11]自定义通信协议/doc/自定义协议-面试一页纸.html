@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>自定义通信协议 · 面试一页纸</title>
+<style>
+  @page { size: A4; margin: 7.5mm 9mm 6mm 9mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    font-size: 8.65pt; line-height: 1.47; color: #222;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1 { font-size: 14pt; font-weight: 600; margin: 0 0 2px; letter-spacing: .3px; }
+  .meta { font-size: 7.4pt; color: #666; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1.4px solid #2b2b2b; }
+  h2 {
+    font-size: 9.4pt; font-weight: 600; margin: 6px 0 2px;
+    padding-left: 7px; border-left: 3px solid #2c6fbb;
+  }
+  p { margin: 2px 0; }
+  .lead {
+    background: #fbf6e9; border-left: 3px solid #d0a02a;
+    padding: 5px 8px; margin: 3px 0 2px; font-size: 8.6pt; line-height: 1.55;
+  }
+  pre {
+    background: #f6f6f3; border-left: 3px solid #bfbfb8;
+    padding: 4px 8px; margin: 3px 0; font-family: Consolas, "Courier New", monospace;
+    font-size: 7.95pt; line-height: 1.48; white-space: pre-wrap;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 7.95pt; margin: 2px 0 1px; }
+  th { background: #eef3f9; font-weight: 600; text-align: left; }
+  th, td { border: 0.5px solid #cfd6df; padding: 2.4px 4.5px; vertical-align: top; }
+  ol, ul { margin: 2px 0 1px; padding-left: 16px; }
+  li { margin-bottom: 2.2px; }
+  code {
+    font-family: Consolas, "Courier New", monospace; font-size: 7.9pt;
+    background: #f0f0ec; padding: 0 2px; border-radius: 2px; color: #1d3f63;
+  }
+  .note {
+    margin-top: 5px; padding-top: 4px; border-top: 0.5px dashed #c8c8c8;
+    font-size: 7.5pt; color: #555; line-height: 1.55;
+  }
+  .keep { page-break-inside: avoid; }
+  b, strong { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>自定义通信协议 · 面试一页纸</h1>
+<div class="meta">
+  工程 <code>[19-11]自定义通信协议</code>　·　STM32F103C8T6 @72 MHz　·　USART1 115200 8N1　·　2026-11-24 整理
+</div>
+
+<h2>30 秒开场</h2>
+<div class="lead">
+  串口只给你字节流，没有边界、没有完整性校验。我在 USART 中断上叠了一层自定义帧：<b>AA 55</b> 定位帧头，<b>LEN</b> 定长度，<b>CRC16</b> 校验内容。解析用逐字节状态机，不依赖任何超时判断，所以粘包和半包天然成立。协议部分 250 行 C，整个工程 Code 6.9 KB，编译 0 Error 0 Warning。
+</div>
+
+<h2>一、帧结构</h2>
+<pre>AA 55 │ LEN │ CMD │ DATA[LEN] │ CRC_L CRC_H
+帧头     长度   命令    数据段        校验</pre>
+<ul>
+  <li>整帧 = <b>6 + LEN</b>；LEN ≤ 32；LEN = 0 时是最短的 6 字节纯命令帧</li>
+  <li>CRC 覆盖 <code>LEN + CMD + DATA</code>，<b>不含两个帧头</b>；<b>低字节先发</b>（Modbus 惯例）</li>
+  <li>CRC16/MODBUS：多项式 <code>0xA001</code>、初值 <code>0xFFFF</code>、无输出反转；<code>"123456789"</code> → <code>0x4B37</code></li>
+</ul>
+<table>
+  <tr><th style="width:14%">字段</th><th style="width:22%">解决什么</th><th>为什么是它</th></tr>
+  <tr><td><code>AA 55</code></td><td>从哪开始</td><td>单字节误同步概率 1/256，双字节 1/65536</td></tr>
+  <tr><td><code>LEN</code></td><td>到哪结束</td><td>长度是<b>内容</b>，与字节何时到达无关</td></tr>
+  <tr><td><code>CRC16</code></td><td>有没有坏</td><td>单比特 / 双比特 / 奇数位 / ≤16 bit 突发错 100% 检出</td></tr>
+</table>
+
+<h2>二、解析：7 态状态机</h2>
+<p><code>HEAD1 → HEAD2 → LEN → CMD → DATA×(LEN) → CRC_L → CRC_H → 出帧</code></p>
+<pre>int8_t Proto_Parse(uint8_t byte, ProtoFrame_t *out);
+/*  0 未成帧   1 成帧   -1 校验错   -2 长度非法  */</pre>
+<p style="margin-bottom:2px">三个非显然的设计决定：</p>
+<ol>
+  <li><b><code>ST_HEAD2</code> 里再来一个 <code>0xAA</code> 不动作</b>，留在原状态 —— <code>AA AA 55 …</code> 这类重叠帧头也能同步；若回 <code>HEAD1</code> 会被自己的帧头带偏。</li>
+  <li><b><code>ST_LEN</code> 里 <code>LEN &gt; 32</code> 立即 Reset 返回 -2</b>，不按非法长度收数据 —— <code>s_raw</code> 只有 34 字节，按 40 收会越界写。</li>
+  <li><b><code>ST_CRC_H</code> 里不论对错都 Reset</b> —— 对了要接下一帧（粘包），错了要重新找同步点。</li>
+</ol>
+
+<h2>三、三个真踩过的坑（面试最值钱的部分）</h2>
+<ol>
+  <li><b><code>Transmit_IT</code> 后紧跟阻塞发送，一个字节都发不出去</b>：<code>_IT</code> 一返回 <code>gState</code> 就是 <code>BUSY_TX</code>，阻塞版第一句 <code>if (gState == READY)</code> 不成立，整串返回 <code>HAL_BUSY</code>。</li>
+  <li><b>靠 IDLE 判帧</b>：<code>HAL_UARTEx_ReceiveToIdle_DMA</code> 同时开了半传输中断，64 字节帧收到第 32 字节就以 HT 事件回调一次，帧被切成两段；帧内停顿超过 1 个字符时间也会被切。<b>IDLE 是物理现象，不是数据内容。</b></li>
+  <li><b>把长度字段直接当索引用</b>：<code>&amp;RxBuff[3]</code> 越界写正好命中 <code>uwTickFreq</code>（0x20000004），<code>uwTick</code> 被加错值，所有 <code>HAL_Delay</code> 快 88 倍 —— 现象是"程序整体跑飞"，根因离现场很远。</li>
+</ol>
+
+<h2>四、追问速答</h2>
+<table>
+  <tr><th style="width:30%">追问</th><th>一句话</th></tr>
+  <tr><td>数据段里出现 <code>AA 55</code> 会不会误判？</td><td>不会。进 DATA 态后只按 LEN 计数，不再比对帧头；帧头匹配只发生在帧边界</td></tr>
+  <tr><td>为什么会粘包 / 半包，怎么处理？</td><td>不需要额外代码：状态存 static，出帧回 HEAD1。粘包 = 紧跟的 <code>AA 55</code> 自动成新帧头；半包 = 状态跨时间保留</td></tr>
+  <tr><td>校验错了为什么不回 NACK？</td><td>坏帧静默丢，重传交给应用层超时。回 NACK 也保证不了对端收到，反而多一次失败机会</td></tr>
+  <tr><td>为什么不用求和或奇偶校验？</td><td>求和看不出顺序（AB 与 BA 同值）；奇偶只覆盖奇数个比特翻转，双比特错完全看不见</td></tr>
+  <tr><td>帧头为什么用两个字节？</td><td>一字节误同步 1/256，两字节 1/65536；且数据段里出现 <code>AA</code> 不会被误当帧头</td></tr>
+  <tr><td>吞吐和开销？</td><td>32 字节数据 → 38 字节帧。115200 下每字节 86.8 µs，单帧约 3.3 ms，协议开销 6/38 ≈ 16%</td></tr>
+  <tr><td>解析放在中断里安全吗？</td><td>前提是开销可控：逐位 CRC 约 0.9 µs/字节（<b>待 DWT 实测</b>），38 字节约 30 µs，小于一个字符时间 86.8 µs。LEN 放大到几百字节就必须搬到主循环</td></tr>
+  <tr><td>和 Modbus RTU 什么关系？</td><td>帧尾 CRC 参数完全一致（<code>0xA001</code> / <code>0xFFFF</code> / 低字节先发）。区别：Modbus 靠 3.5 字符静默判帧，我用长度字段，所以不怕分包和帧内停顿</td></tr>
+</table>
+
+<h2>五、收尾</h2>
+<p>它和 Modbus RTU 同源，但我把"靠时间判边界"换成了"靠内容判边界"。只改了这一处，粘包、半包、帧内停顿就全部自动成立。</p>
+<p>错误分三类计数（CRC 错 / 长度错 / 主循环来不及处理丢帧），分开统计才能判断是线路噪声、上位机发错，还是 MCU 处理不及。</p>
+
+<div class="note">
+  <b>口径提醒</b>：Code 6.9 KB、0 Error 0 Warning、CRC <code>0x4B37</code> 均为实测；解析耗时为推算，面试就说"还没用 DWT 量"。
+</div>
+
+</body>
+</html>
