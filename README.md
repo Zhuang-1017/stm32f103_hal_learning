@@ -25,6 +25,7 @@
 | `[19-10]DMA与串口的应用` | **DMA 收发不定长**：`HAL_UARTEx_ReceiveToIdle_DMA(&huart1, RxBuff, 64)` 启动 DMA 接收，IDLE 触发 `HAL_UARTEx_RxEventCallback`，`Size` 为本帧长度；回调中用 `HAL_UART_Transmit_DMA` 回显并重开接收。USART1_RX 绑 **DMA1_Channel5**、USART1_TX 绑 **DMA1_Channel4**，均为 `DMA_NORMAL`；**两个 DMA 通道中断必须使能**，否则 `UART_DMATransmitCplt` 不执行，`gState` 永远停在 `BUSY_TX`，之后所有 `printf` 都会返回 `HAL_BUSY` |
 | `[19-11]自定义通信协议` | **自定义帧协议**：`AA 55` + `LEN` + `CMD` + `DATA[LEN]` + `CRC_L CRC_H`，整帧 = 6 + LEN、LEN ≤ 32；CRC16/MODBUS（`0xA001` / 初值 `0xFFFF` / 低字节先发，`"123456789"` → `0x4B37`）。解析用**逐字节 7 态状态机** `Proto_Parse()`（返回 `0` 未成帧 / `1` 成帧 / `-1` 校验错 / `-2` 长度非法），状态存 `static` → **粘包、半包天然成立，不依赖任何超时**。要点：`ST_HEAD2` 遇到重复 `0xAA` 留在原状态（支持 `AA AA 55` 重叠帧头）、`LEN` 越界立刻丢弃（防越界写）、`ST_CRC_H` 出帧后不论对错都 `Reset`。工程 `doc/` 里附面试讲稿 `自定义协议-面试一页纸.pdf` |
 | `[21-1]ADC单通道和电位器的应用` | **ADC 单通道轮询采样**：`MX_ADC1_Init()` 配 ADC1_IN6（**PA6**）单次转换、非扫描、12 位右对齐；上电先 `HAL_ADCEx_Calibration_Start()` 校准一次 → 主循环 `HAL_ADC_Start` + `HAL_ADC_PollForConversion(&hadc1,50)` + `HAL_ADC_GetValue` → `V = ADC × 3.3 / 4095` → printf 每 500 ms 打印。ADCCLK = PCLK2/6 = **12 MHz**（上限 14 MHz）。手边没有电位器时可用两只 10k 电阻分压（取样点 1.65 V → 读数 ≈2048）替代。**采样时间必须从 1.5 cycles 调到 55.5 以上**：1.5 cycles 只允许源阻抗 1.6 kΩ，10k 分压的等效源阻抗 5 kΩ，会让读数系统性偏低 |
+| `[21-2]ADC多通道，光敏，热敏，红外反射` | **ADC 多通道扫描采样**：ADC1 扫描序列 rank1/2/3 = **CH4(PA4 光敏) / CH5(PA5 红外反射) / CH6(PA6 热敏)**，`NbrOfConversion=3`。关键在 **`DiscontinuousConvMode=ENABLE` + `NbrOfDiscConversion=1`**：间断模式下每次软件触发只转换 1 个通道、序列指针自动前进、EOC 每通道置位一次，所以 `for` 循环里连续三次 `HAL_ADC_Start` 才能依次拿到 CH4/CH5/CH6（第 4 次回绕到 CH4）；若关掉 DISCEN，一次 Start 会转完整个序列且 EOC 只在末尾置位，重复 Start 则重启序列，三路读数会全部等于 CH4。换算 `V = (float)ADC × 3.3 / 4095` —— **必须强转 float**，`uint32_t / 4095` 是整数除法，先被截断成 0 或 1，除满量程外全部打印 0.000。采样时间仍为 1.5 cycles，只允许源阻抗 610 Ω，传感器模块几乎一定偏低 |
 
 ## 硬件平台
 
@@ -48,6 +49,8 @@
 >
 > 跑 `[21-1]` 这类 **ADC** 实验时，**PA6 上不要挂蜂鸣器模块**（`[12]` 用的就是 PA6），否则模块会分走电流、把采集到的电压拉低。`[21-1]` 采集的正是 PA6 = ADC1_IN6。
 
+> 跑 `[21-2]` **多通道 ADC** 时，**PA4 / PA5 / PA6 三个引脚上以前插过的模块必须全部拔掉**：PA4 是 `[11]`/`[12]` 的按键 K1、PA5 是 `[18]` 的外部中断按键、PA6 是 `[12]` 的蜂鸣器。切到 `GPIO_MODE_ANALOG` 后内部上下拉被关闭，按键不按即悬空、按下被拉到 0 V 或 3.3 V 满量程，蜂鸣器模块同样会把电压带偏 —— 现象是「读数忽大忽小、和传感器状态无关」，很容易被误判成 ADC 有问题。
+
 ## 开发环境
 
 - 配置工具：STM32CubeMX 6.18
@@ -57,7 +60,7 @@
 ## 如何编译
 
 用 Keil 打开各工程 `MDK-ARM/` 目录下的 `*.uvprojx`，编译并下载到板子即可。
-（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`、`[19-8]` 目录下是 `19-8.uvprojx`、`[19-10]` 目录下是 `19-10.uvprojx`、`[19-11]` 目录下是 `19-11.uvprojx`、`[21-1]` 目录下是 `21-1.uvprojx`，与目录名不必一致。）
+（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`、`[19-8]` 目录下是 `19-8.uvprojx`、`[19-10]` 目录下是 `19-10.uvprojx`、`[19-11]` 目录下是 `19-11.uvprojx`、`[21-1]` 目录下是 `21-1.uvprojx`、`[21-2]` 目录下是 `21-2.uvprojx`，与目录名不必一致。）
 
 ## 目录说明
 
