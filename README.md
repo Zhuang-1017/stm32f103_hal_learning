@@ -24,6 +24,7 @@
 | `[19-8]串口之多串口应用` | **双串口互转**：同时开启 USART1（PA9/PA10）与 USART2（PA2/PA3）的空闲中断接收，两路各自独立缓冲区 `RxBuff1` / `RxBuff2`；回调中按 `huart->Instance` 分流，把本路收的帧**转发到另一路**再重开本路接收。要点：转发必须用**阻塞** `HAL_UART_Transmit`——若用 `Transmit_IT`，`gState` 立刻变 `BUSY_TX`，紧随其后的阻塞打印会因首句 `if (gState == READY)` 不成立而整串返回 `HAL_BUSY`，一个字都出不去；且 `_IT` 未发完就重开接收，同一 buffer 会被边发边写覆盖 |
 | `[19-10]DMA与串口的应用` | **DMA 收发不定长**：`HAL_UARTEx_ReceiveToIdle_DMA(&huart1, RxBuff, 64)` 启动 DMA 接收，IDLE 触发 `HAL_UARTEx_RxEventCallback`，`Size` 为本帧长度；回调中用 `HAL_UART_Transmit_DMA` 回显并重开接收。USART1_RX 绑 **DMA1_Channel5**、USART1_TX 绑 **DMA1_Channel4**，均为 `DMA_NORMAL`；**两个 DMA 通道中断必须使能**，否则 `UART_DMATransmitCplt` 不执行，`gState` 永远停在 `BUSY_TX`，之后所有 `printf` 都会返回 `HAL_BUSY` |
 | `[19-11]自定义通信协议` | **自定义帧协议**：`AA 55` + `LEN` + `CMD` + `DATA[LEN]` + `CRC_L CRC_H`，整帧 = 6 + LEN、LEN ≤ 32；CRC16/MODBUS（`0xA001` / 初值 `0xFFFF` / 低字节先发，`"123456789"` → `0x4B37`）。解析用**逐字节 7 态状态机** `Proto_Parse()`（返回 `0` 未成帧 / `1` 成帧 / `-1` 校验错 / `-2` 长度非法），状态存 `static` → **粘包、半包天然成立，不依赖任何超时**。要点：`ST_HEAD2` 遇到重复 `0xAA` 留在原状态（支持 `AA AA 55` 重叠帧头）、`LEN` 越界立刻丢弃（防越界写）、`ST_CRC_H` 出帧后不论对错都 `Reset`。工程 `doc/` 里附面试讲稿 `自定义协议-面试一页纸.pdf` |
+| `[21-1]ADC单通道和电位器的应用` | **ADC 单通道轮询采样**：`MX_ADC1_Init()` 配 ADC1_IN6（**PA6**）单次转换、非扫描、12 位右对齐；上电先 `HAL_ADCEx_Calibration_Start()` 校准一次 → 主循环 `HAL_ADC_Start` + `HAL_ADC_PollForConversion(&hadc1,50)` + `HAL_ADC_GetValue` → `V = ADC × 3.3 / 4095` → printf 每 500 ms 打印。ADCCLK = PCLK2/6 = **12 MHz**（上限 14 MHz）。手边没有电位器时可用两只 10k 电阻分压（取样点 1.65 V → 读数 ≈2048）替代。**采样时间必须从 1.5 cycles 调到 55.5 以上**：1.5 cycles 只允许源阻抗 1.6 kΩ，10k 分压的等效源阻抗 5 kΩ，会让读数系统性偏低 |
 
 ## 硬件平台
 
@@ -44,6 +45,8 @@
 > 用 USART2 时改接 **TXD → PA3（第 8 脚）、RXD → PA2（第 7 脚）**。注意 PA2 是 TX、PA3 是 RX，与模块的 TXD/RXD 顺序相反，**按同名平推会接成 TX-TX，表现为一个字节都收不到**。另需先拔掉 PA2/PA3 上的 RGB 灯线，否则 LED 挂在 UART 线上吃电流。
 >
 > 跑 `[19-8]` 这类**双串口**实验需要**两个独立的 USB-TTL 模块**（各占电脑一个 USB 口），一路接 PA9/PA10、另一路接 PA2/PA3。只有一个模块时，另一侧没有对端，双向转发无法验证。**切勿**把 PA9/PA10 与 PA2/PA3 互相短接做回环——USART1→USART2→USART1 会形成无限转发。
+>
+> 跑 `[21-1]` 这类 **ADC** 实验时，**PA6 上不要挂蜂鸣器模块**（`[12]` 用的就是 PA6），否则模块会分走电流、把采集到的电压拉低。`[21-1]` 采集的正是 PA6 = ADC1_IN6。
 
 ## 开发环境
 
@@ -54,7 +57,7 @@
 ## 如何编译
 
 用 Keil 打开各工程 `MDK-ARM/` 目录下的 `*.uvprojx`，编译并下载到板子即可。
-（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`、`[19-8]` 目录下是 `19-8.uvprojx`、`[19-10]` 目录下是 `19-10.uvprojx`、`[19-11]` 目录下是 `19-11.uvprojx`，与目录名不必一致。）
+（工程内文件名沿用 CubeMX 生成时的名字，如 `[18]` 目录下是 `19.uvprojx`、`[19-2]` 目录下是 `19-2.uvprojx`、`[19-3]` 目录下是 `19-3.uvprojx`、`[19-4]` 目录下是 `19-4.uvprojx`、`[19-5]` 目录下是 `19-5.uvprojx`、`[19-6]` 目录下是 `19-6.uvprojx`、`[19-7]` 目录下是 `19-7.uvprojx`、`[19-8]` 目录下是 `19-8.uvprojx`、`[19-10]` 目录下是 `19-10.uvprojx`、`[19-11]` 目录下是 `19-11.uvprojx`、`[21-1]` 目录下是 `21-1.uvprojx`，与目录名不必一致。）
 
 ## 目录说明
 
